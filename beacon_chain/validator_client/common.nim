@@ -965,6 +965,7 @@ proc getFeeRecipient*(vc: ValidatorClientRef, pubkey: ValidatorPubKey,
         vc.config.defaultFeeRecipient, withdrawalAddress)
       staticRecipient = getSuggestedFeeRecipient(
         vc.config.validatorsDir, pubkey, perValidatorDefaultFeeRecipient)
+    debug "Registrations", vc_default_fee_recipient = vc.config.defaultFeeRecipient, withdrawal_address = withdrawalAddress, per_validator_default_fee_recipient = perValidatorDefaultFeeRecipient
     if staticRecipient.isOk():
       Opt.some(staticRecipient.get())
     else:

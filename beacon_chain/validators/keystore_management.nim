@@ -826,7 +826,9 @@ proc getSuggestedFeeRecipient*(
   # In this particular case, an error might be by design. If the file exists,
   # but doesn't load or parse that is more urgent. People might prefer not to
   # override default suggested fee recipients per validator, so don't warn.
-  if not dirExists(validatorsDir.validatorKeystoreDir(pubkey)):
+  let dirForPubKey = validatorsDir.validatorKeystoreDir(pubkey)
+  if not dirExists(dirForPubKey):
+    debug "Validator directory for pubkey does not exist", dir_for_pub_key=dirForPubKey
     return err noSuchValidator
 
   let feeRecipientPath = validatorsDir.feeRecipientPath(pubkey)
