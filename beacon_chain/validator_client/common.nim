@@ -965,10 +965,7 @@ proc getFeeRecipient*(vc: ValidatorClientRef, pubkey: ValidatorPubKey,
         vc.config.defaultFeeRecipient, withdrawalAddress)
       staticRecipient = getSuggestedFeeRecipient(
         vc.config.validatorsDir, pubkey, perValidatorDefaultFeeRecipient)
-    if staticRecipient.isOk():
-      Opt.some(staticRecipient.get())
-    else:
-      Opt.none(Eth1Address)
+    Opt.some(staticRecipient.valueOr(perValidatorDefaultFeeRecipient))
 
 proc getGasLimit*(vc: ValidatorClientRef,
                   pubkey: ValidatorPubKey): uint64 =
