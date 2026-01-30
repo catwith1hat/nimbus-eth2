@@ -9,6 +9,7 @@
 {.used.}
 
 import
+  std/os,
   unittest2,
   ../beacon_chain/[beacon_chain_db, beacon_chain_db_quarantine],
   ../beacon_chain/consensus_object_pools/block_dag,
@@ -982,3 +983,79 @@ suite "FinalizedBlocks" & preset():
       items += 1
 
     check: items == 2
+
+suite "Tiered Storage" & preset():
+  test "Tiered storage - basic ops" & preset():
+    let
+      baseDir = "test_tiered_db"
+      coldPath = baseDir / "cold"
+    
+    # Clean up from previous runs
+    if dirExists(baseDir):
+      removeDir(baseDir)
+    
+    let db = BeaconChainDB.new(
+      baseDir, cfg, inMemory = false,
+      coldStoragePath = some(coldPath))
+    
+    check:
+      db.coldStorageEnabled == true
+      dirExists(coldPath)
+      fileExists(coldPath / "nbc_cold.sqlite3")
+
+    # Test putting a block (should go to cold storage if enabled)
+    let
+      signedBlock = withDigest((phase0.TrustedBeaconBlock)())
+      root = hash_tree_root(signedBlock.message)
+    
+    db.putBlock(signedBlock)
+    
+    check:
+      db.containsBlock(root)
+      db.getBlock(root, phase0.TrustedSignedBeaconBlock).get() == signedBlock
+    
+    # Test checkpointing
+    db.checkpoint()
+    
+    db.close()
+    
+    # Reopen and check
+    let db2 = BeaconChainDB.new(
+      baseDir, cfg, inMemory = false,
+      coldStoragePath = some(coldPath))
+    
+    check:
+      db2.coldStorageEnabled == true
+      db2.containsBlock(root)
+      db2.getBlock(root, phase0.TrustedSignedBeaconBlock).get() == signedBlock
+    
+    db2.close()
+    removeDir(baseDir)
+
+  test "Tiered storage - backward compatibility (disabled)" & preset():
+    let
+      baseDir = "test_hot_only_db"
+    
+    if dirExists(baseDir):
+      removeDir(baseDir)
+    
+    let db = BeaconChainDB.new(
+      baseDir, cfg, inMemory = false,
+      coldStoragePath = none(string))
+    
+    check:
+      db.coldStorageEnabled == false
+    
+    let
+      signedBlock = withDigest((phase0.TrustedBeaconBlock)())
+      root = hash_tree_root(signedBlock.message)
+    
+    db.putBlock(signedBlock)
+    
+    check:
+      db.containsBlock(root)
+      db.getBlock(root, phase0.TrustedSignedBeaconBlock).get() == signedBlock
+    
+    db.close()
+    removeDir(baseDir)
+

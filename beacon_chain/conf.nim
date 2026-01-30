@@ -642,6 +642,17 @@ type
         desc: "Reindex historical states for archive access"
         name: "reindex".}: bool
 
+      coldStoragePath* {.
+        desc: "Path for cold storage database (historical blocks, states, blobs). " &
+              "If not specified, all data stored in main database."
+        name: "cold-storage-path" .}: Option[OutDir]
+
+      coldStorageThreshold* {.
+        desc: "Slots older than this threshold are considered cold data. " &
+              "Default: 100000 slots (~2 weeks)"
+        defaultValue: 100000
+        name: "cold-storage-threshold" .}: uint64
+
       trustedSetupFile* {.
         hidden
         desc: "Alternative EIP-4844 trusted setup file"

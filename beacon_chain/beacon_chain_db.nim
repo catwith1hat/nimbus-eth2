@@ -8,7 +8,7 @@
 {.push raises: [].}
 
 import
-  std/[typetraits, tables],
+  std/[options, typetraits, tables],
   results,
   stew/[arrayops, assign2, byteutils, endians2, io2, objects],
   serialization, chronicles, snappy,
@@ -24,6 +24,7 @@ import
        db_utils,
        filepath]
 
+from std/os import `/`
 from ./spec/datatypes/capella import BeaconState
 from ./spec/datatypes/deneb import TrustedSignedBeaconBlock
 
@@ -101,6 +102,10 @@ type
     ## that data write order is respected - the strategy thus becomes to write
     ## bulk data first, then update pointers like the `head root` entry.
     db*: SqStoreRef
+
+    # Tiered storage support
+    coldStorageEnabled*: bool
+    coldStorageSchema: string  # "cold" when enabled, "" otherwise
 
     v0: BeaconChainDBV0
     genesisDeposits*: DepositsSeq
@@ -505,7 +510,9 @@ proc new*(T: type BeaconChainDBV0,
 
 proc new*(T: type BeaconChainDB,
           db: SqStoreRef,
-          cfg: RuntimeConfig
+          cfg: RuntimeConfig,
+          coldStorageEnabled = false,
+          coldStorageSchema = ""
     ): BeaconChainDB =
   if not db.readOnly:
     # Remove the deposits table we used before we switched
@@ -529,45 +536,53 @@ proc new*(T: type BeaconChainDB,
     immutableValidatorsDb =
       DbSeq[ImmutableValidatorDataDb2].init(db, "immutable_validators2").expectDb()
 
+    # Schema for cold storage tables (empty string = main database)
+    coldSchema = if coldStorageEnabled: coldStorageSchema else: ""
+
     # V1 - expected-to-be small rows get without rowid optimizations
+    # Hot tables stay in main database
     keyValues = kvStore db.openKvStore("key_values", true).expectDb()
+
+    # Cold tables: blocks go to cold storage if enabled
     blocks = [
-      kvStore db.openKvStore("blocks").expectDb(),
-      kvStore db.openKvStore("altair_blocks").expectDb(),
-      kvStore db.openKvStore("bellatrix_blocks").expectDb(),
-      kvStore db.openKvStore("capella_blocks").expectDb(),
-      kvStore db.openKvStore("deneb_blocks").expectDb(),
-      kvStore db.openKvStore("electra_blocks").expectDb(),
+      kvStore db.openKvStore("blocks", schema = coldSchema).expectDb(),
+      kvStore db.openKvStore("altair_blocks", schema = coldSchema).expectDb(),
+      kvStore db.openKvStore("bellatrix_blocks", schema = coldSchema).expectDb(),
+      kvStore db.openKvStore("capella_blocks", schema = coldSchema).expectDb(),
+      kvStore db.openKvStore("deneb_blocks", schema = coldSchema).expectDb(),
+      kvStore db.openKvStore("electra_blocks", schema = coldSchema).expectDb(),
       if cfg.FULU_FORK_EPOCH != FAR_FUTURE_EPOCH:
-        kvStore db.openKvStore("fulu_blocks").expectDb()
+        kvStore db.openKvStore("fulu_blocks", schema = coldSchema).expectDb()
       else:
         nil,
       if cfg.GLOAS_FORK_EPOCH != FAR_FUTURE_EPOCH:
-        kvStore db.openKvStore("foobar_not_real_name").expectDb()
+        kvStore db.openKvStore("foobar_not_real_name", schema = coldSchema).expectDb()
       else:
         nil
     ]
 
     stateRoots = kvStore db.openKvStore("state_roots", true).expectDb()
 
+    # Cold tables: states go to cold storage if enabled
     statesNoVal = [
-      kvStore db.openKvStore("state_no_validators").expectDb(),
-      kvStore db.openKvStore("altair_state_no_validators").expectDb(),
-      kvStore db.openKvStore("bellatrix_state_no_validators").expectDb(),
-      kvStore db.openKvStore("capella_state_no_validator_pubkeys").expectDb(),
-      kvStore db.openKvStore("deneb_state_no_validator_pubkeys").expectDb(),
-      kvStore db.openKvStore("electra_state_no_validator_pubkeys").expectDb(),
+      kvStore db.openKvStore("state_no_validators", schema = coldSchema).expectDb(),
+      kvStore db.openKvStore("altair_state_no_validators", schema = coldSchema).expectDb(),
+      kvStore db.openKvStore("bellatrix_state_no_validators", schema = coldSchema).expectDb(),
+      kvStore db.openKvStore("capella_state_no_validator_pubkeys", schema = coldSchema).expectDb(),
+      kvStore db.openKvStore("deneb_state_no_validator_pubkeys", schema = coldSchema).expectDb(),
+      kvStore db.openKvStore("electra_state_no_validator_pubkeys", schema = coldSchema).expectDb(),
       if cfg.FULU_FORK_EPOCH != FAR_FUTURE_EPOCH:
-        kvStore db.openKvStore("fulu_state_no_validator_pubkeys").expectDb()
+        kvStore db.openKvStore("fulu_state_no_validator_pubkeys", schema = coldSchema).expectDb()
       else:
         nil,
       if cfg.GLOAS_FORK_EPOCH != FAR_FUTURE_EPOCH:
-        kvStore db.openKvStore("more_intentional_gibberish___").expectDb()
+        kvStore db.openKvStore("more_intentional_gibberish___", schema = coldSchema).expectDb()
       else:
         nil
     ]
 
-    stateDiffs = kvStore db.openKvStore("state_diffs").expectDb()
+    # Cold table: state diffs go to cold storage if enabled
+    stateDiffs = kvStore db.openKvStore("state_diffs", schema = coldSchema).expectDb()
     summaries = kvStore db.openKvStore("beacon_block_summaries", true).expectDb()
     finalizedBlocks = FinalizedBlocks.init(db, "finalized_blocks").expectDb()
 
@@ -600,8 +615,10 @@ proc new*(T: type BeaconChainDB,
       sealedPeriods: "lc_sealed_periods")).expectDb()
   static: doAssert LightClientDataFork.high == LightClientDataFork.Electra
 
-  var blobs = kvStore db.openKvStore("deneb_blobs").expectDb()
+  # Cold table: blobs go to cold storage if enabled
+  var blobs = kvStore db.openKvStore("deneb_blobs", schema = coldSchema).expectDb()
 
+  # Cold table: columns go to cold storage if enabled
   var columns = [
     nil, # Phase0
     nil, # Altair
@@ -610,10 +627,10 @@ proc new*(T: type BeaconChainDB,
     nil, # Deneb
     nil, # Electra
     if cfg.FULU_FORK_EPOCH != FAR_FUTURE_EPOCH:
-      kvStore db.openKvStore("fulu_columns").expectDb()
+      kvStore db.openKvStore("fulu_columns", schema = coldSchema).expectDb()
     else: nil,
     if cfg.GLOAS_FORK_EPOCH != FAR_FUTURE_EPOCH:
-      kvStore db.openKvStore("gloas_columns").expectDb()
+      kvStore db.openKvStore("gloas_columns", schema = coldSchema).expectDb()
     else: nil
   ]
 
@@ -650,11 +667,17 @@ proc new*(T: type BeaconChainDB,
 
   T(
     db: db,
+    coldStorageEnabled: coldStorageEnabled,
+    coldStorageSchema: coldStorageSchema,
     v0: BeaconChainDBV0.new(db, readOnly = true),
     genesisDeposits: genesisDepositsSeq,
     immutableValidatorsDb: immutableValidatorsDb,
     immutableValidators: loadImmutableValidators(immutableValidatorsDb),
-    checkpoint: proc() = db.checkpoint(),
+    checkpoint: proc() =
+      db.checkpoint()
+      # Checkpoint cold storage if enabled
+      if coldStorageEnabled and coldStorageSchema.len > 0:
+        db.checkpointDatabase(coldStorageSchema),
     keyValues: keyValues,
     blocks: blocks,
     blobs: blobs,
@@ -673,7 +696,8 @@ proc new*(T: type BeaconChainDB,
           dir: string,
           cfg: RuntimeConfig,
           inMemory = false,
-          readOnly = false
+          readOnly = false,
+          coldStoragePath = none(string)
     ): BeaconChainDB =
   let db =
     if inMemory:
@@ -688,7 +712,28 @@ proc new*(T: type BeaconChainDB,
 
       SqStoreRef.init(
         dir, "nbc", readOnly = readOnly, manualCheckpoint = true).expectDb()
-  BeaconChainDB.new(db, cfg)
+
+  # Attach cold storage if configured
+  var coldStorageEnabled = false
+  let coldStorageSchema = "cold"
+
+  if coldStoragePath.isSome and not inMemory:
+    let coldPath = coldStoragePath.get()
+    # Create cold storage directory if it doesn't exist
+    if (let res = secureCreatePath(coldPath); res.isErr):
+      warn "Failed to create cold storage directory, using single database",
+        path = coldPath, err = ioErrorMsg(res.error)
+    else:
+      let coldDbPath = coldPath / "nbc_cold.sqlite3"
+      let attached = db.attachDatabase(coldDbPath, coldStorageSchema)
+      if attached.isOk:
+        coldStorageEnabled = true
+        info "Cold storage attached", path = coldDbPath
+      else:
+        warn "Failed to attach cold storage, using single database",
+          error = attached.error, path = coldDbPath
+
+  BeaconChainDB.new(db, cfg, coldStorageEnabled, coldStorageSchema)
 
 template getQuarantineDB*(db: BeaconChainDB): QuarantineDB =
   db.quarantine
