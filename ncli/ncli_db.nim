@@ -58,6 +58,10 @@ type
       defaultValue: "db"
       desc: "Directory where `nbc.sqlite` is stored"
       name: "db".}: InputDir
+    coldStoragePath* {.
+      desc: "Path for cold storage database (historical blocks, states, blobs). " &
+            "If not specified, all data stored in main database."
+      name: "cold-storage-path" .}: Option[OutDir]
 
     eraDir* {.
       defaultValue: "era"
@@ -222,12 +226,20 @@ func getSlotRange(dag: ChainDAGRef, startSlot: int64, count: uint64): (Slot, Slo
       else: start + count
   (start, ends)
 
+func getColdStoragePath(conf: DbConf): Option[string] =
+  if conf.coldStoragePath.isSome:
+    some(string(conf.coldStoragePath.get))
+  else:
+    none(string)
+
 proc cmdBench(conf: DbConf, cfg: RuntimeConfig) =
   var timers: array[Timers, RunningStat]
 
   echo "Opening database..."
   let
-    db = BeaconChainDB.new(conf.databaseDir.string, cfg, readOnly = true)
+    db = BeaconChainDB.new(
+      conf.databaseDir.string, cfg, readOnly = true,
+      coldStoragePath = getColdStoragePath(conf))
     dbBenchmark = BeaconChainDB.new("benchmark", cfg)
   defer:
     db.close()
@@ -391,7 +403,9 @@ proc cmdBench(conf: DbConf, cfg: RuntimeConfig) =
   printTimers(false, timers)
 
 proc cmdDumpState(conf: DbConf, cfg: RuntimeConfig) =
-  let db = BeaconChainDB.new(conf.databaseDir.string, cfg, readOnly = true)
+  let db = BeaconChainDB.new(
+    conf.databaseDir.string, cfg, readOnly = true,
+    coldStoragePath = getColdStoragePath(conf))
   defer: db.close()
 
   let
@@ -428,7 +442,9 @@ proc cmdDumpState(conf: DbConf, cfg: RuntimeConfig) =
     echo "Couldn't load ", stateRoot
 
 proc cmdPutState(conf: DbConf, cfg: RuntimeConfig) =
-  let db = BeaconChainDB.new(conf.databaseDir.string, cfg)
+  let db = BeaconChainDB.new(
+    conf.databaseDir.string, cfg,
+    coldStoragePath = getColdStoragePath(conf))
   defer: db.close()
 
   for file in conf.stateFile:
@@ -449,7 +465,9 @@ proc cmdPutState(conf: DbConf, cfg: RuntimeConfig) =
       db.putState(forkyState)
 
 proc cmdDumpBlock(conf: DbConf, cfg: RuntimeConfig) =
-  let db = BeaconChainDB.new(conf.databaseDir.string, cfg, readOnly = true)
+  let db = BeaconChainDB.new(
+    conf.databaseDir.string, cfg, readOnly = true,
+    coldStoragePath = getColdStoragePath(conf))
   defer: db.close()
 
   for blockRoot in conf.blockRootx:
@@ -469,7 +487,9 @@ proc cmdDumpBlock(conf: DbConf, cfg: RuntimeConfig) =
       echo "Couldn't load ", blockRoot, ": ", e.msg
 
 proc cmdPutBlock(conf: DbConf, cfg: RuntimeConfig) =
-  let db = BeaconChainDB.new(conf.databaseDir.string, cfg)
+  let db = BeaconChainDB.new(
+    conf.databaseDir.string, cfg,
+    coldStoragePath = getColdStoragePath(conf))
   defer: db.close()
 
   for file in conf.blckFile:
@@ -496,7 +516,9 @@ proc cmdPutBlock(conf: DbConf, cfg: RuntimeConfig) =
         db.putGenesisBlock(forkyBlck.root)
 
 proc cmdPutBlob(conf: DbConf, cfg: RuntimeConfig) =
-  let db = BeaconChainDB.new(conf.databaseDir.string, cfg)
+  let db = BeaconChainDB.new(
+    conf.databaseDir.string, cfg,
+    coldStoragePath = getColdStoragePath(conf))
   defer: db.close()
 
   for file in conf.blobFile:
@@ -521,7 +543,9 @@ proc cmdPutBlob(conf: DbConf, cfg: RuntimeConfig) =
 
 proc cmdRewindState(conf: DbConf, cfg: RuntimeConfig) =
   echo "Opening database..."
-  let db = BeaconChainDB.new(conf.databaseDir.string, cfg, readOnly = true)
+  let db = BeaconChainDB.new(
+    conf.databaseDir.string, cfg, readOnly = true,
+    coldStoragePath = getColdStoragePath(conf))
   defer: db.close()
 
   if (let v = ChainDAGRef.isInitialized(db); v.isErr()):
@@ -557,7 +581,9 @@ proc cmdVerifyEra(conf: DbConf, cfg: RuntimeConfig) =
   echo root
 
 proc cmdExportEra(conf: DbConf, cfg: RuntimeConfig) =
-  let db = BeaconChainDB.new(conf.databaseDir.string, cfg, readOnly = true)
+  let db = BeaconChainDB.new(
+    conf.databaseDir.string, cfg, readOnly = true,
+    coldStoragePath = getColdStoragePath(conf))
   defer: db.close()
 
   if (let v = ChainDAGRef.isInitialized(db); v.isErr()):
@@ -676,7 +702,9 @@ proc cmdExportEra(conf: DbConf, cfg: RuntimeConfig) =
     quit QuitFailure
 
 proc cmdImportEra(conf: DbConf, cfg: RuntimeConfig) =
-  let db = BeaconChainDB.new(conf.databaseDir.string, cfg)
+  let db = BeaconChainDB.new(
+    conf.databaseDir.string, cfg,
+    coldStoragePath = getColdStoragePath(conf))
   defer: db.close()
 
   type Timers = enum
@@ -741,7 +769,9 @@ type
 proc cmdValidatorPerf(conf: DbConf, cfg: RuntimeConfig) =
   echo "Opening database..."
   let
-    db = BeaconChainDB.new(conf.databaseDir.string, cfg, readOnly = true)
+    db = BeaconChainDB.new(
+      conf.databaseDir.string, cfg, readOnly = true,
+      coldStoragePath = getColdStoragePath(conf))
   defer:
     db.close()
 
@@ -978,7 +1008,9 @@ proc insertValidators(db: SqStoreRef, state: ForkedHashedBeaconState,
 proc cmdValidatorDb(conf: DbConf, cfg: RuntimeConfig) =
   # Create a database with performance information for every epoch
   info "Opening database..."
-  let db = BeaconChainDB.new(conf.databaseDir.string, cfg, readOnly = true)
+  let db = BeaconChainDB.new(
+    conf.databaseDir.string, cfg, readOnly = true,
+    coldStoragePath = getColdStoragePath(conf))
   defer: db.close()
 
   if (let v = ChainDAGRef.isInitialized(db); v.isErr()):

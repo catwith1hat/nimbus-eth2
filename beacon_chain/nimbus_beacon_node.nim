@@ -820,7 +820,14 @@ proc init*(
       optUpdateQueue: newAsyncEventQueue[
         RestVersioned[ForkedLightClientOptimisticUpdate]](),
       optFinHeaderUpdateQueue: newAsyncEventQueue[ForkedLightClientHeader]())
-    db = BeaconChainDB.new(config.databaseDir, cfg, inMemory = false)
+    coldStoragePath =
+      if config.coldStoragePath.isSome:
+        some(string(config.coldStoragePath.get))
+      else:
+        none(string)
+    db = BeaconChainDB.new(
+      config.databaseDir, cfg, inMemory = false,
+      coldStoragePath = coldStoragePath)
 
   if config.externalBeaconApiUrl.isSome and ChainDAGRef.isInitialized(db).isErr:
     let trustedBlockRoot =
@@ -3026,7 +3033,14 @@ proc handleStartUpCmd(config: var BeaconNodeConf) {.raises: [CatchableError].} =
 
     let
       metadata = loadEth2Network(config)
-      db = BeaconChainDB.new(config.databaseDir, metadata.cfg, inMemory = false)
+      coldStoragePath =
+        if config.coldStoragePath.isSome:
+          some(string(config.coldStoragePath.get))
+        else:
+          none(string)
+      db = BeaconChainDB.new(
+        config.databaseDir, metadata.cfg, inMemory = false,
+        coldStoragePath = coldStoragePath)
       genesisState = waitFor fetchGenesisState(metadata)
     waitFor db.doRunTrustedNodeSync(
       metadata,

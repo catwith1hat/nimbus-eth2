@@ -270,6 +270,11 @@ type
       obsolete: "Deprecated in v22.9"
       name: "require-engine-api-in-bellatrix" .}: Option[bool]
 
+    coldStoragePath* {.
+      desc: "Path for cold storage database (historical blocks, states, blobs). " &
+            "If not specified, all data stored in main database."
+      name: "cold-storage-path" .}: Option[OutDir]
+
     case cmd* {.
       command
       defaultValue: BNStartUpCmd.beaconNode .}: BNStartUpCmd
@@ -637,6 +642,12 @@ type
         desc: "Retention strategy for historical data (archive/prune)"
         defaultValue: HistoryMode.Prune
         name: "history".}: HistoryMode
+
+      coldStorageThreshold* {.
+        desc: "Slots older than this threshold are considered cold data. " &
+              "Default: 100000 slots (~2 weeks)"
+        defaultValue: 100000
+        name: "cold-storage-threshold" .}: uint64
 
       trustedSetupFile* {.
         hidden
