@@ -519,6 +519,26 @@ type
     validator_index*: RestValidatorIndex
     reward*: RestReward
 
+  RestAttestationReward* = object
+    validator_index*: RestValidatorIndex
+    head*: RestReward
+    target*: RestReward
+    source*: RestReward
+    inclusion_delay*: Opt[RestReward]
+    inactivity*: RestReward
+
+  RestIdealAttestationReward* = object
+    effective_balance*: Gwei
+    head*: RestReward
+    target*: RestReward
+    source*: RestReward
+    inclusion_delay*: Opt[RestReward]
+    inactivity*: RestReward
+
+  RestAttestationsRewards* = object
+    ideal_rewards*: seq[RestIdealAttestationReward]
+    total_rewards*: seq[RestAttestationReward]
+
   # Types based on the OAPI yaml file - used in responses to requests
   GetBeaconHeadResponse* = DataEnclosedObject[Slot]
   GetAggregatedAttestationResponse* = DataEnclosedObject[phase0.Attestation]
