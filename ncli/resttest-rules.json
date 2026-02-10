@@ -5268,5 +5268,104 @@
       "headers": {"Accept": "application/json"}
     },
     "response": {"status": {"operator": "equals", "value": "400"}}
+  },
+  {
+    "topics": ["beacon", "rewards", "attestations_rewards_epoch"],
+    "request": {
+      "method": "POST",
+      "url": "/eth/v1/beacon/rewards/attestations/0",
+      "headers": {"Accept": "application/json"}
+    },
+    "response": {
+      "status": {"operator": "equals", "value": "200"},
+      "headers": [{"key": "Content-Type", "value": "application/json", "operator": "equals"}],
+      "body": [{"operator": "jstructcmps", "start": ["data"], "value": {"ideal_rewards": [{"effective_balance": "", "head": "", "target": "", "source": "", "inactivity": ""}], "total_rewards": [{"validator_index": "", "head": "", "target": "", "source": "", "inactivity": ""}]}}]
+    }
+  },
+  {
+    "topics": ["beacon", "rewards", "attestations_rewards_epoch"],
+    "request": {
+      "method": "POST",
+      "body": {
+        "content-type": "application/json",
+        "data": "[]"
+      },
+      "url": "/eth/v1/beacon/rewards/attestations/0",
+      "headers": {"Accept": "application/json"}
+    },
+    "response": {
+      "status": {"operator": "equals", "value": "200"},
+      "headers": [{"key": "Content-Type", "value": "application/json", "operator": "equals"}],
+      "body": [{"operator": "jstructcmps", "start": ["data"], "value": {"ideal_rewards": [{"effective_balance": "", "head": "", "target": "", "source": "", "inactivity": ""}], "total_rewards": [{"validator_index": "", "head": "", "target": "", "source": "", "inactivity": ""}]}}]
+    }
+  },
+  {
+    "topics": ["beacon", "rewards", "attestations_rewards_epoch"],
+    "request": {
+      "method": "POST",
+      "url": "/eth/v1/beacon/rewards/attestations/heat",
+      "headers": {"Accept": "application/json"}
+    },
+    "response": {"status": {"operator": "equals", "value": "400"}}
+  },
+  {
+    "topics": ["beacon", "rewards", "attestations_rewards_epoch"],
+    "request": {
+      "method": "POST",
+      "url": "/eth/v1/beacon/rewards/attestations/18446744073709551616",
+      "headers": {"Accept": "application/json"}
+    },
+    "response": {
+      "status": {"operator": "equals", "value": "400"},
+      "headers": [{"key": "Content-Type", "value": "application/json", "operator": "equals"}],
+      "body": [{"operator": "jstructcmpns", "value": {"code": 400, "message": ""}}]
+    }
+  },
+  {
+    "topics": ["beacon", "rewards", "attestations_rewards_epoch"],
+    "request": {
+      "method": "POST",
+      "url": "/eth/v1/beacon/rewards/attestations/18446744073709551615",
+      "headers": {"Accept": "application/json"}
+    },
+    "response": {
+      "status": {"operator": "equals", "value": "400"},
+      "headers": [{"key": "Content-Type", "value": "application/json", "operator": "equals"}],
+      "body": [{"operator": "jstructcmpns", "value": {"code": 400, "message": ""}}]
+    }
+  },
+  {
+    "topics": ["beacon", "rewards", "attestations_rewards_epoch"],
+    "request": {
+      "method": "POST",
+      "body": {
+        "content-type": "application/json",
+        "data": "{}"
+      },
+      "url": "/eth/v1/beacon/rewards/attestations/0",
+      "headers": {"Accept": "application/json"}
+    },
+    "response": {
+      "status": {"operator": "equals", "value": "400"},
+      "headers": [{"key": "Content-Type", "value": "application/json", "operator": "equals"}],
+      "body": [{"operator": "jstructcmpns", "value": {"code": 400, "message": ""}}]
+    }
+  },
+  {
+    "topics": ["beacon", "rewards", "attestations_rewards_epoch"],
+    "request": {
+      "method": "POST",
+      "body": {
+        "content-type": "application/json",
+        "data": "\"oops\""
+      },
+      "url": "/eth/v1/beacon/rewards/attestations/0",
+      "headers": {"Accept": "application/json"}
+    },
+    "response": {
+      "status": {"operator": "equals", "value": "400"},
+      "headers": [{"key": "Content-Type", "value": "application/json", "operator": "equals"}],
+      "body": [{"operator": "jstructcmpns", "value": {"code": 400, "message": ""}}]
+    }
   }
 ]

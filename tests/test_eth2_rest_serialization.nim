@@ -277,6 +277,58 @@ suite "REST encoding and decoding":
       jsonErrorList(RestApiResponse, Http408, "data", ["s1", "s2"]) ==
         """{"code":408,"message":"data","failures":["s1","s2"]}"""
 
+  test "Attestations rewards roundtrip":
+    let rewards = RestAttestationsRewards(
+      ideal_rewards: @[
+        RestIdealAttestationReward(
+          effective_balance: Gwei(32_000_000_000'u64),
+          head: RestReward(2500'i64),
+          target: RestReward(5000'i64),
+          source: RestReward(5000'i64),
+          inclusion_delay: Opt.some(RestReward(1500'i64)),
+          inactivity: RestReward(0'i64))],
+      total_rewards: @[
+        RestAttestationReward(
+          validator_index: RestValidatorIndex(0'u64),
+          head: RestReward(2000'i64),
+          target: RestReward(2000'i64),
+          source: RestReward(4000'i64),
+          inclusion_delay: Opt.some(RestReward(1200'i64)),
+          inactivity: RestReward(-500'i64))])
+
+    let
+      encoded = RestJson.encode(rewards)
+      decoded = RestJson.decode(encoded, RestAttestationsRewards)
+      recoded = RestJson.encode(decoded)
+    check encoded == recoded
+
+  test "Attestations rewards omit inclusion_delay when absent":
+    let rewards = RestAttestationsRewards(
+      ideal_rewards: @[
+        RestIdealAttestationReward(
+          effective_balance: Gwei(32_000_000_000'u64),
+          head: RestReward(2500'i64),
+          target: RestReward(5000'i64),
+          source: RestReward(5000'i64),
+          inclusion_delay: Opt.none(RestReward),
+          inactivity: RestReward(0'i64))],
+      total_rewards: @[
+        RestAttestationReward(
+          validator_index: RestValidatorIndex(0'u64),
+          head: RestReward(2000'i64),
+          target: RestReward(2000'i64),
+          source: RestReward(4000'i64),
+          inclusion_delay: Opt.none(RestReward),
+          inactivity: RestReward(-500'i64))])
+    let
+      encoded = RestJson.encode(rewards)
+      decoded = RestJson.decode(encoded, RestAttestationsRewards)
+      recoded = RestJson.encode(decoded)
+
+    check:
+      not encoded.contains("\"inclusion_delay\"")
+      encoded == recoded
+
   test "strictParse(Stuint) tests":
     const
       GoodVectors16 = [
