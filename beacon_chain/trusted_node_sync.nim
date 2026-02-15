@@ -8,6 +8,7 @@
 {.push raises: [], gcsafe.}
 
 import
+  std/options,
   stew/base10,
   chronicles, chronos, eth/async_utils,
   ./sync/[light_client_sync_helpers, sync_manager],
@@ -558,7 +559,14 @@ when isMainModule:
     databaseDir = os.paramStr(2)
     syncTarget = TrustedNodeSyncTarget.fromStateId(os.paramStr(5))
     backfill = os.paramCount() > 5 and os.paramStr(6) == "true"
-    db = BeaconChainDB.new(databaseDir, cfg, inMemory = false)
+    coldStoragePath =
+      if os.paramCount() > 6 and os.paramStr(7).len > 0:
+        some(os.paramStr(7))
+      else:
+        none(string)
+    db = BeaconChainDB.new(
+      databaseDir, cfg, inMemory = false,
+      coldStoragePath = coldStoragePath)
   waitFor db.doTrustedNodeSync(
     cfg, databaseDir, os.paramStr(3),
     os.paramStr(4), syncTarget, backfill, false)

@@ -124,6 +124,7 @@ nav:
       - 'keymanager-api.md'
     - Storage:
       - 'data-dir.md'
+      - 'tiered-storage.md'
       - 'era-store.md'
       - 'history.md'
     - 'web3signer.md'

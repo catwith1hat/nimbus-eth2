@@ -151,7 +151,14 @@ proc setupDatabase(
 ): Future[Opt[BeaconChainDB]] {.async: (raises: [CancelledError]).} =
   # Open the database and initialize it with genesis/checkpoint if it wasn't
   # setup before - fails if the data sources we use are broken
-  let db = BeaconChainDB.new(config.databaseDir, metadata.cfg, inMemory = false)
+  let coldStoragePath =
+    if config.coldStoragePath.isSome:
+      some(string(config.coldStoragePath.get))
+    else:
+      none(string)
+  let db = BeaconChainDB.new(
+    config.databaseDir, metadata.cfg, inMemory = false,
+    coldStoragePath = coldStoragePath)
 
   if ChainDAGRef.isInitialized(db).isOk():
     if config.finalizedCheckpointState.isSome:
@@ -3001,7 +3008,14 @@ proc handleStartUpCmd(config: var BeaconNodeConf) {.raises: [CatchableError].} =
 
     let
       metadata = loadEth2Network(config)
-      db = BeaconChainDB.new(config.databaseDir, metadata.cfg, inMemory = false)
+      coldStoragePath =
+        if config.coldStoragePath.isSome:
+          some(string(config.coldStoragePath.get))
+        else:
+          none(string)
+      db = BeaconChainDB.new(
+        config.databaseDir, metadata.cfg, inMemory = false,
+        coldStoragePath = coldStoragePath)
       genesisState = (waitFor fetchGenesisState(metadata, config.eraDir)).valueOr:
         quit 1
     waitFor db.doRunTrustedNodeSync(

@@ -270,6 +270,11 @@ type
       obsolete: "Deprecated in v22.9"
       name: "require-engine-api-in-bellatrix" .}: Option[bool]
 
+    coldStoragePath* {.
+      desc: "Path for cold storage database (historical blocks, states, blobs). " &
+            "If not specified, all data stored in main database."
+      name: "cold-storage-path" .}: Option[OutDir]
+
     case cmd* {.
       command
       defaultValue: BNStartUpCmd.beaconNode .}: BNStartUpCmd
